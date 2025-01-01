@@ -131,24 +131,6 @@ class FederatedServer:
         return loss, global_accuracy, global_auc
 
 
-# Helper function to prune dataset
-def return_pruned_dataset(data):
-    # Compute the correlation matrix
-    correlation_matrix = data.corr()
-
-    # Create a heatmap using seaborn
-    plt.figure(figsize=(12, 10))
-    sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap="coolwarm", cbar=True)
-    plt.title("Correlation Matrix Heatmap", fontsize=16)
-    plt.tight_layout()
-    plt.show()
-
-    # Select features with correlation >= 0.3
-    selected_features = correlation_matrix['smoking'][abs(correlation_matrix['smoking']) >= 0.3].index.tolist()
-    selected_features.remove('smoking')  # Remove the target variable itself
-    print(selected_features)
-    return data.drop(columns=selected_features)
-
 
 # Main function
 def main():
@@ -168,7 +150,7 @@ def main():
         upper_limit = np.percentile(data[column], 99)
         data[column] = np.clip(data[column], None, upper_limit)
 
-    data = return_pruned_dataset(data.drop(columns=['ID']))
+    # data = return_pruned_dataset(data.drop(columns=['ID']))
 
     X = data.drop(columns=['smoking'])
     y = data['smoking']
