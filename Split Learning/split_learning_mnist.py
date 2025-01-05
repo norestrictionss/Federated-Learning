@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+from test_split import load_model, test, save_model
 
 # Server Model (First part of the model)
 class ServerModel(nn.Module):
@@ -52,7 +53,6 @@ def train(server_model, client_models, server_optimizer, client_optimizers, sche
         for batch_idx, (data, labels) in enumerate(train_loader):
             data = data.view(data.size(0), -1)  # Flatten the input images (e.g., 28x28 -> 784)
 
-            # Step 1: Server computes forward pass
             server_output = server_model(data)
             print(f"\nBatch {batch_idx + 1}: Server output (cut layer) summary - "
                   f"Mean: {server_output.mean().item():.4f}, Std: {server_output.std().item():.4f}, "
@@ -60,12 +60,11 @@ def train(server_model, client_models, server_optimizer, client_optimizers, sche
 
             client_losses = []
 
-            # Step 2: Each client computes its forward pass and loss
             for i in range(num_clients):
                 print(f"\nTraining Client {i + 1}...")
 
                 # Client forward pass
-                client_output = client_models[i](server_output.detach())  # Detach to avoid modifying server gradients
+                client_output = client_models[i](server_output.detach())  
                 loss = criterion(client_output, labels)
 
                 print(f"Client {i + 1} output summary - "
@@ -73,28 +72,41 @@ def train(server_model, client_models, server_optimizer, client_optimizers, sche
                       f"Loss: {loss.item():.4f}")
 
                 client_losses.append(loss)
-
-                # Step 3: Backward pass for each client
                 client_optimizers[i].zero_grad()
                 loss.backward()
                 client_optimizers[i].step()
-
-            # Step 4: Aggregate client gradients and update server
             server_optimizer.zero_grad()
             total_loss = sum(loss.item() for loss in client_losses)
             epoch_loss += total_loss
 
             print(f"Batch {batch_idx + 1} Total Loss: {total_loss:.4f}")
-
-        # Step 5: Update learning rate using the scheduler
         scheduler.step()
 
         print(f"Epoch {epoch} Average Loss: {epoch_loss / len(train_loader):.4f}")
 
-# Example of using a DataLoader for training (e.g., MNIST dataset)
+
 transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
 train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-# Train the model with multiple clients
-train(server_model, client_models, server_optimizer, client_optimizers, scheduler, train_loader)
+
+
+# train(server_model, client_models, server_optimizer, client_optimizers, scheduler, train_loader)
+
+# Test the model after training
+# test(server_model, client_models, test_loader)
+
+# Save the trained model to hardware
+# save_model(server_model, client_models, 'trained_model.pth')
+
+
+load_model(server_model, client_models, 'trained_model.pth')
+test(server_model, client_models, test_loader)
+
+# Loading the trained model from hardware
+
+
+# Testing the model after loading it
+# test(server_model, client_models, test_loader)
